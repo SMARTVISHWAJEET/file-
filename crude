@@ -1,0 +1,81 @@
+from flask import Flask, request, jsonify
+import os
+import json
+import uuid
+
+app = Flask(__name__)
+
+data_file = "tasks.json"
+
+
+def read_data():
+    if os.path.exists(data_file):
+        with open(data_file, "r") as f:
+            tasks = json.load(f)
+        return tasks
+    else:
+        return []
+
+
+def write_data(tasks):
+    with open(data_file, "w") as f:
+        json.dump(tasks, f, indent=2)
+
+@app.route("/tasks", methods=["GET"])
+def get_tasks():
+    tasks = read_data()
+    return jsonify(tasks)
+
+@app.route("/tasks", methods=["POST"])
+def create_task():
+    data = request.get_json()
+    title = data.get("title")
+    description = data.get("description")
+
+    if title and description:
+        tasks = read_data()
+        new_task = {"id": str(uuid.uuid4()), "title": title, "description": description}
+        tasks.append(new_task)
+        write_data(tasks)
+        return jsonify(new_task), 201
+    else:
+        return jsonify({"error": "Title and description are required"}), 400
+
+@app.route("/tasks/<task_id>", methods=["GET"])
+def get_task(task_id):
+    tasks = read_data()
+    task = next((t for t in tasks if t["id"] == task_id), None)
+    if task:
+        return jsonify(task)
+    else:
+        return jsonify({"error": "Task not found"}), 404
+
+@app.route("/tasks/<task_id>", methods=["PUT"])
+def update_task(task_id):
+    data = request.get_json()
+    title = data.get("title")
+    description = data.get("description")
+
+    if title and description:
+        tasks = read_data()
+        task = next((t for t in tasks if t["id"] == task_id), None)
+        if task:
+            task["title"] = title
+            task["description"] = description
+            write_data(tasks)
+            return jsonify(task)
+        else:
+            return jsonify({"error": "Task not found"}), 404
+    else:
+        return jsonify({"error": "Title and description are required"}), 400
+
+
+@app.route("/tasks/<task_id>", methods=["DELETE"])
+def delete_task(task_id):
+    tasks = read_data()
+    tasks = [t for t in tasks if t["id"] != task_id]
+    write_data(tasks)
+    return jsonify({"message": "Task deleted successfully"})
+
+if __name__ == "__main__":
+    app.run(debug=True)
